@@ -1,0 +1,8 @@
+# Enable URL rewriting
+RewriteEngine On
+
+# Block access to .env and config files
+<FilesMatch "\.(env|json|lock|gitignore|htaccess|ini|phar|sh|md|xml)$">
+  Order allow,deny
+  Deny from all
+</FilesMatch> 
