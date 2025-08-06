@@ -455,7 +455,7 @@ mysqli_stmt_close($stmt);
           </div>
         <?php endif; ?>
         <div class="order-actions">
-          <span class="badge-status badge-<?= $order['status'] ?>">
+          <span class="badge-status badge-<?= $order['status'] ?> bg-white">
             <?= ucwords(str_replace('_', ' ', $order['status'])) ?>
           </span>
           <form method="POST" class="d-flex align-items-center" onsubmit="return confirmStatusUpdate(this);">
@@ -491,13 +491,13 @@ mysqli_stmt_close($stmt);
     <div class="modal-dialog">
       <form method="POST" class="modal-content" id="cancelForm">
         <div class="modal-header">
-          <h5 class="modal-title"><i class="fas fa-times me-2"></i>Cancel Order</h5>
+          <h5 class="modal-title text-dark"><i class="fas fa-times me-2 text-dark"></i>Cancel Order</h5>
           <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
           <input type="hidden" name="cancel_booking_id" id="cancel_booking_id">
           <div class="mb-3">
-            <label for="excuse_message" class="form-label">Excuse Message (required)</label>
+            <label for="excuse_message" class="form-label text-dark">Excuse Message (required)</label>
             <textarea name="excuse_message" id="excuse_message" class="form-control" required rows="4" placeholder="Explain why you are cancelling this order..."></textarea>
           </div>
         </div>

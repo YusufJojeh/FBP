@@ -383,12 +383,12 @@ if (isset($_GET['msg'])) {
     <div class="modal-dialog">
       <form method="POST" class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title"><i class="fas fa-times me-2"></i>Cancel Booking</h5>
+          <h5 class="modal-title text-dark"><i class="fas fa-times me-2 text-dark"></i>Cancel Booking</h5>
           <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
           <input type="hidden" name="cancel_booking_id" id="cancel_booking_id">
-          <p>Are you sure you want to cancel this booking?</p>
+          <p class="text-center text-dark">Are you sure you want to cancel this booking?</p>
         </div>
         <div class="modal-footer">
           <button type="submit" class="btn btn-danger w-100"><i class="fas fa-times me-2"></i>Cancel Booking</button>

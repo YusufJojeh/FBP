@@ -211,13 +211,13 @@ while ($row = mysqli_fetch_assoc($result)) {
         <div class="modal-dialog modal-dialog-centered">
           <form method="POST" class="modal-content" onsubmit="return bookSubmit(this)">
             <div class="modal-header">
-              <h5 class="modal-title"><i class="fas fa-bookmark me-2"></i>Book “<?= htmlspecialchars($s['title']) ?>”</h5>
-              <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+              <h5 class="modal-title text-dark"><i class="fas fa-bookmark me-2"></i>Book “<?= htmlspecialchars($s['title']) ?>”</h5>
+              <button type="button" class="btn-close btn-close-dark" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
               <input type="hidden" name="service_id" value="<?= $s['id'] ?>">
               <div class="mb-3">
-                <label for="requirements-<?= $s['id'] ?>">Your Requirements</label>
+                <label class="text-dark" for="requirements-<?= $s['id'] ?>">Your Requirements</label>
                 <textarea id="requirements-<?= $s['id'] ?>" name="requirements" class="form-control" rows="4" required></textarea>
               </div>
             </div>

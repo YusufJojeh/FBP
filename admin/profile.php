@@ -17,6 +17,7 @@ $result = mysqli_stmt_get_result($stmt);
 $profile = mysqli_fetch_assoc($result);
 mysqli_stmt_close($stmt);
 
+// Handle profile image upload
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username']);
     $email = trim($_POST['email']);
@@ -37,18 +38,66 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     
+    // Profile image upload
+    $profile_image = $profile['profile_image'] ?? '';
+    if (isset($_FILES['profile_image']) && $_FILES['profile_image']['error'] === UPLOAD_ERR_OK) {
+        $allowed = ['jpg', 'jpeg', 'png', 'gif', 'svg'];
+        $filename = $_FILES['profile_image']['name'];
+        $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+        if (in_array($ext, $allowed)) {
+            $new_filename = uniqid('profile_') . '.' . $ext;
+            $upload_path = '../uploads/' . $new_filename;
+            if (move_uploaded_file($_FILES['profile_image']['tmp_name'], $upload_path)) {
+                if ($profile['profile_image'] && file_exists('../uploads/' . $profile['profile_image'])) {
+                    unlink('../uploads/' . $profile['profile_image']);
+                }
+                $profile_image = $new_filename;
+            }
+        }
+    }
+    
     if (!$error) {
         mysqli_begin_transaction($conn);
         try {
-            if ($new_password) {
-                $stmt = mysqli_prepare($conn, "UPDATE users SET username = ?, email = ?, password = ? WHERE id = ? AND role = 'admin'");
-                mysqli_stmt_bind_param($stmt, 'sssi', $username, $email, $new_password, $admin_id);
-            } else {
-                $stmt = mysqli_prepare($conn, "UPDATE users SET username = ?, email = ? WHERE id = ? AND role = 'admin'");
-                mysqli_stmt_bind_param($stmt, 'ssi', $username, $email, $admin_id);
+            // Only update fields that have changed
+            $update_fields = [];
+            $update_values = [];
+            $update_types = '';
+            
+            if ($username !== $profile['username']) {
+                $update_fields[] = 'username = ?';
+                $update_values[] = $username;
+                $update_types .= 's';
             }
-            mysqli_stmt_execute($stmt);
-            mysqli_stmt_close($stmt);
+            
+            if ($email !== $profile['email']) {
+                $update_fields[] = 'email = ?';
+                $update_values[] = $email;
+                $update_types .= 's';
+            }
+            
+            if ($new_password) {
+                $update_fields[] = 'password = ?';
+                $update_values[] = $new_password;
+                $update_types .= 's';
+            }
+            
+            if ($profile_image !== ($profile['profile_image'] ?? '')) {
+                $update_fields[] = 'profile_image = ?';
+                $update_values[] = $profile_image;
+                $update_types .= 's';
+            }
+            
+            if (!empty($update_fields)) {
+                $update_values[] = $admin_id;
+                $update_types .= 'i';
+                
+                $sql = "UPDATE users SET " . implode(', ', $update_fields) . " WHERE id = ? AND role = 'admin'";
+                $stmt = mysqli_prepare($conn, $sql);
+                mysqli_stmt_bind_param($stmt, $update_types, ...$update_values);
+                mysqli_stmt_execute($stmt);
+                mysqli_stmt_close($stmt);
+            }
             
             mysqli_commit($conn);
             $msg = 'Profile updated successfully!';
@@ -57,6 +106,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Update profile data for display
             $profile['username'] = $username;
             $profile['email'] = $email;
+            $profile['profile_image'] = $profile_image;
             
         } catch (Exception $e) {
             mysqli_rollback($conn);
@@ -156,6 +206,16 @@ $last_login = "2024-01-21 15:30:00"; // Example static date, implement actual tr
             font-size:3rem;
             color:#764ba2;
             box-shadow:0 8px 32px rgba(0,0,0,0.2);
+            position:relative; /* Added for positioning the form */
+        }
+
+        .profile-image {
+            width:100%;
+            height:100%;
+            border-radius:50%;
+            object-fit:cover;
+            border:3px solid #ffd700;
+            box-shadow:0 5px 15px rgba(0,0,0,.2);
         }
 
         .profile-info h3 {
@@ -317,7 +377,17 @@ $last_login = "2024-01-21 15:30:00"; // Example static date, implement actual tr
             <!-- Profile Sidebar -->
             <div class="profile-sidebar">
                 <div class="profile-avatar">
-                    <i class="fas fa-user-shield"></i>
+                    <?php if (!empty($profile['profile_image']) && file_exists('../uploads/' . $profile['profile_image'])): ?>
+                        <img src="../uploads/<?= htmlspecialchars($profile['profile_image']) ?>" alt="Profile" class="profile-image" style="width:120px;height:120px;border-radius:50%;object-fit:cover;border:3px solid #ffd700;box-shadow:0 5px 15px rgba(0,0,0,.2);">
+                    <?php else: ?>
+                        <img src="https://via.placeholder.com/120x120" alt="Profile" class="profile-image" style="width:120px;height:120px;border-radius:50%;object-fit:cover;border:3px solid #ffd700;box-shadow:0 5px 15px rgba(0,0,0,.2);">
+                    <?php endif; ?>
+                    <form method="POST" enctype="multipart/form-data" id="profile_image_form">
+                        <label class="profile-image-upload" title="Upload new image" style="position:absolute;bottom:0;right:0;background:#ffd700;border-radius:50%;width:35px;height:35px;display:flex;align-items:center;justify-content:center;cursor:pointer;">
+                            <i class="fas fa-camera"></i>
+                            <input type="file" name="profile_image" id="profile_image" accept="image/*" style="display:none" onchange="document.getElementById('profile_image_form').submit();">
+                        </label>
+                    </form>
                 </div>
                 <div class="profile-info">
                     <h3><?= htmlspecialchars($profile['username']) ?></h3>

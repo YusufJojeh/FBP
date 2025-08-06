@@ -25,6 +25,12 @@ if (!isset($profile['display_name'])) {
     $profile['profile_image'] = '';
 }
 
+// Ensure $profile keys exist to avoid undefined array key warnings
+$profile['username'] = $profile['username'] ?? '';
+$profile['email'] = $profile['email'] ?? '';
+$profile['display_name'] = $profile['display_name'] ?? '';
+$profile['bio'] = $profile['bio'] ?? '';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username']);
     $email = trim($_POST['email']);
@@ -56,22 +62,73 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Start transaction
     mysqli_begin_transaction($conn);
     try {
-        // Update user table
-        if ($password) {
-            $stmt = mysqli_prepare($conn, "UPDATE users SET username = ?, email = ?, password = ? WHERE id = ?");
-            mysqli_stmt_bind_param($stmt, 'sssi', $username, $email, $password, $vendor_id);
-        } else {
-            $stmt = mysqli_prepare($conn, "UPDATE users SET username = ?, email = ? WHERE id = ?");
-            mysqli_stmt_bind_param($stmt, 'ssi', $username, $email, $vendor_id);
+        // Only update users table fields that have changed
+        $user_update_fields = [];
+        $user_update_values = [];
+        $user_update_types = '';
+        
+        if ($username !== $profile['username']) {
+            $user_update_fields[] = 'username = ?';
+            $user_update_values[] = $username;
+            $user_update_types .= 's';
         }
-        mysqli_stmt_execute($stmt);
-        mysqli_stmt_close($stmt);
+        
+        if ($email !== $profile['email']) {
+            $user_update_fields[] = 'email = ?';
+            $user_update_values[] = $email;
+            $user_update_types .= 's';
+        }
+        
+        if ($password) {
+            $user_update_fields[] = 'password = ?';
+            $user_update_values[] = $password;
+            $user_update_types .= 's';
+        }
+        
+        if (!empty($user_update_fields)) {
+            $user_update_values[] = $vendor_id;
+            $user_update_types .= 'i';
+            
+            $sql = "UPDATE users SET " . implode(', ', $user_update_fields) . " WHERE id = ?";
+            $stmt = mysqli_prepare($conn, $sql);
+            mysqli_stmt_bind_param($stmt, $user_update_types, ...$user_update_values);
+            mysqli_stmt_execute($stmt);
+            mysqli_stmt_close($stmt);
+        }
 
-        // Update vendors table
-        $stmt = mysqli_prepare($conn, "UPDATE vendors SET display_name = ?, bio = ?, profile_image = ? WHERE user_id = ?");
-        mysqli_stmt_bind_param($stmt, 'sssi', $display_name, $bio, $profile_image, $vendor_id);
-        mysqli_stmt_execute($stmt);
-        mysqli_stmt_close($stmt);
+        // Only update vendors table fields that have changed
+        $vendor_update_fields = [];
+        $vendor_update_values = [];
+        $vendor_update_types = '';
+        
+        if ($display_name !== $profile['display_name']) {
+            $vendor_update_fields[] = 'display_name = ?';
+            $vendor_update_values[] = $display_name;
+            $vendor_update_types .= 's';
+        }
+        
+        if ($bio !== $profile['bio']) {
+            $vendor_update_fields[] = 'bio = ?';
+            $vendor_update_values[] = $bio;
+            $vendor_update_types .= 's';
+        }
+        
+        if ($profile_image !== ($profile['profile_image'] ?? '')) {
+            $vendor_update_fields[] = 'profile_image = ?';
+            $vendor_update_values[] = $profile_image;
+            $vendor_update_types .= 's';
+        }
+        
+        if (!empty($vendor_update_fields)) {
+            $vendor_update_values[] = $vendor_id;
+            $vendor_update_types .= 'i';
+            
+            $sql = "UPDATE vendors SET " . implode(', ', $vendor_update_fields) . " WHERE user_id = ?";
+            $stmt = mysqli_prepare($conn, $sql);
+            mysqli_stmt_bind_param($stmt, $vendor_update_types, ...$vendor_update_values);
+            mysqli_stmt_execute($stmt);
+            mysqli_stmt_close($stmt);
+        }
 
         mysqli_commit($conn);
         $msg = 'Profile updated successfully!';
@@ -128,7 +185,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .nav-link:hover::after, .nav-link.active::after { width:100%; }
 
         .profile-container {
-            max-width:800px;
+            max-width:1200px; /* Increased max-width for grid layout */
             margin:4.5rem auto 2rem;
             padding:2.5rem;
             background:rgba(255,255,255,0.11);
@@ -136,26 +193,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             box-shadow:0 16px 40px rgba(0,0,0,.23);
             backdrop-filter: blur(12px);
             animation: fadeInUp 1s;
+            display:flex; /* Use flexbox for grid layout */
+            gap:2rem; /* Space between sidebar and main content */
         }
-        .profile-header {
+        .profile-grid {
+            display:grid;
+            grid-template-columns: 1fr 2fr; /* Sidebar (1/3) and Main content (2/3) */
+            gap:2rem;
+        }
+        .profile-sidebar {
+            background:rgba(255,255,255,0.08);
+            border-radius:15px;
+            padding:2rem;
+            display:flex;
+            flex-direction:column;
+            align-items:center;
             text-align:center;
-            margin-bottom:2rem;
         }
-        .profile-header h2 {
-            font-weight:800;
-            font-size:2rem;
-            margin-bottom:.5rem;
-        }
-        .profile-header p {
-            color:#ffd700;
-            font-size:1.1rem;
-            opacity:.9;
-        }
-        .profile-image-container {
+        .profile-avatar {
             position:relative;
             width:120px;
             height:120px;
-            margin:0 auto 1.5rem;
+            margin-bottom:1.5rem;
         }
         .profile-image {
             width:100%;
@@ -184,6 +243,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         .profile-image-upload input {
             display:none;
+        }
+        .profile-info h3 {
+            font-weight:800;
+            font-size:1.8rem;
+            margin-bottom:.5rem;
+        }
+        .profile-info p {
+            color:#ffd700;
+            font-size:1.1rem;
+            opacity:.9;
+            margin-bottom:.5rem;
+        }
+        .profile-info p i {
+            margin-right:5px;
+        }
+        .profile-stats {
+            display:flex;
+            justify-content:space-around;
+            width:100%;
+            margin-top:1.5rem;
+            padding:1rem 0;
+            border-top:1px solid rgba(255,255,255,0.2);
+            border-bottom:1px solid rgba(255,255,255,0.2);
+        }
+        .stat-item {
+            text-align:center;
+        }
+        .stat-item i {
+            font-size:1.5rem;
+            margin-bottom:.5rem;
+            color:#ffd700;
+        }
+        .stat-item br {
+            display:none; /* Remove line break for smaller screens */
+        }
+        .form-section {
+            background:rgba(255,255,255,0.08);
+            border-radius:15px;
+            padding:2rem;
+            margin-bottom:2rem;
+        }
+        .form-section h4 {
+            font-weight:600;
+            font-size:1.4rem;
+            margin-bottom:1.5rem;
+            color:#ffd700;
+        }
+        .form-section h4 i {
+            margin-right:10px;
+            color:#ffd700;
         }
         .form-floating label {
             color: #ffd700;
@@ -260,62 +369,96 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </nav>
 
     <div class="profile-container">
-        <div class="profile-header">
-            <div class="profile-image-container">
-                <?php if ($profile['profile_image'] && file_exists('../uploads/' . $profile['profile_image'])): ?>
-                    <img src="../uploads/<?= htmlspecialchars($profile['profile_image']) ?>" alt="Profile" class="profile-image">
-                <?php else: ?>
-                    <img src="https://via.placeholder.com/120x120" alt="Profile" class="profile-image">
-                <?php endif; ?>
-                <label class="profile-image-upload" title="Upload new image">
-                    <i class="fas fa-camera"></i>
-                    <input type="file" id="profile_image_input" accept="image/*">
-                </label>
+        <div class="profile-grid">
+            <!-- Profile Sidebar -->
+            <div class="profile-sidebar" style="position:relative;">
+                <div class="profile-avatar" style="position:relative;">
+                    <?php if (!empty($profile['profile_image']) && file_exists('../uploads/' . $profile['profile_image'])): ?>
+                        <img src="../uploads/<?= htmlspecialchars($profile['profile_image']) ?>" alt="Profile" class="profile-image" style="width:120px;height:120px;border-radius:50%;object-fit:cover;border:3px solid #ffd700;box-shadow:0 5px 15px rgba(0,0,0,.2);">
+                    <?php else: ?>
+                        <img src="https://via.placeholder.com/120x120" alt="Profile" class="profile-image" style="width:120px;height:120px;border-radius:50%;object-fit:cover;border:3px solid #ffd700;box-shadow:0 5px 15px rgba(0,0,0,.2);">
+                    <?php endif; ?>
+                    <form method="POST" enctype="multipart/form-data" id="profile_image_form">
+                        <label class="profile-image-upload" title="Upload new image" style="position:absolute;bottom:0;right:0;background:#ffd700;border-radius:50%;width:35px;height:35px;display:flex;align-items:center;justify-content:center;cursor:pointer;">
+                            <i class="fas fa-camera"></i>
+                            <input type="file" name="profile_image" id="profile_image" accept="image/*" style="display:none" onchange="document.getElementById('profile_image_form').submit();">
+                        </label>
+                    </form>
+                </div>
+                <div class="profile-info">
+                    <h3><?= htmlspecialchars($profile['display_name'] ?: $profile['username']) ?></h3>
+                    <p><i class="fas fa-envelope me-2"></i><?= htmlspecialchars($profile['email']) ?></p>
+                    <p><i class="fas fa-user-tie me-2"></i>Vendor</p>
+                </div>
+                <div class="profile-stats">
+                    <div class="stat-item">
+                        <i class="fas fa-clock me-2"></i>
+                        Last Login:<br>
+                        <?= $profile['last_login'] ? date('M j, Y g:i A', strtotime($profile['last_login'])) : '-' ?>
+                    </div>
+                    <div class="stat-item">
+                        <i class="fas fa-user-check me-2"></i>
+                        Account Status:<br>
+                        <span class="<?= $profile['status'] === 'active' ? 'text-success' : ($profile['status'] === 'suspended' ? 'text-danger' : 'text-warning') ?>">
+                            <?= ucfirst($profile['status']) ?>
+                        </span>
+                    </div>
+                    <div class="stat-item">
+                        <i class="fas fa-calendar-alt me-2"></i>
+                        Member Since:<br>
+                        <?= date('M j, Y', strtotime($profile['created_at'])) ?>
+                    </div>
+                </div>
             </div>
-            <h2><?= htmlspecialchars($profile['display_name'] ?: $profile['username']) ?></h2>
-            <p>Manage your vendor profile and account settings</p>
-        </div>
-
-        <form method="POST" enctype="multipart/form-data" id="profile_form">
-            <div class="row g-4">
-                <div class="col-md-6">
-                    <div class="form-floating mb-3">
-                        <input type="text" class="form-control" id="username" name="username" placeholder=" " value="<?= htmlspecialchars($profile['username']) ?>" required>
-                        <label for="username">Username</label>
+            <!-- Profile Main Content -->
+            <div class="profile-main">
+                <form method="POST" enctype="multipart/form-data" id="profile_form">
+                    <div class="form-section">
+                        <h4><i class="fas fa-user me-2"></i>Basic Information</h4>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="form-floating">
+                                    <input type="text" class="form-control" id="username" name="username" placeholder="Username" value="<?= htmlspecialchars($profile['username']) ?>" required>
+                                    <label for="username">Username</label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-floating">
+                                    <input type="email" class="form-control" id="email" name="email" placeholder="Email" value="<?= htmlspecialchars($profile['email']) ?>" required>
+                                    <label for="email">Email Address</label>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <div class="form-floating">
+                                    <input type="text" class="form-control" id="display_name" name="display_name" placeholder="Display Name" value="<?= htmlspecialchars($profile['display_name']) ?>" required>
+                                    <label for="display_name">Display Name (shown to clients)</label>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <div class="form-floating">
+                                    <textarea class="form-control" id="bio" name="bio" placeholder="Bio" style="height:120px"><?= htmlspecialchars($profile['bio']) ?></textarea>
+                                    <label for="bio">Bio (tell clients about yourself)</label>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </div>
-                <div class="col-md-6">
-                    <div class="form-floating mb-3">
-                        <input type="email" class="form-control" id="email" name="email" placeholder=" " value="<?= htmlspecialchars($profile['email']) ?>" required>
-                        <label for="email">Email</label>
+                    <div class="form-section">
+                        <h4><i class="fas fa-lock me-2"></i>Change Password</h4>
+                        <div class="row g-3">
+                            <div class="col-md-12">
+                                <div class="form-floating">
+                                    <input type="password" class="form-control" id="password" name="password" placeholder="New Password">
+                                    <label for="password">New Password (leave blank to keep current)</label>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </div>
-                <div class="col-12">
-                    <div class="form-floating mb-3">
-                        <input type="text" class="form-control" id="display_name" name="display_name" placeholder=" " value="<?= htmlspecialchars($profile['display_name']) ?>" required>
-                        <label for="display_name">Display Name (shown to clients)</label>
-                    </div>
-                </div>
-                <div class="col-12">
-                    <div class="form-floating mb-3">
-                        <textarea class="form-control" id="bio" name="bio" placeholder=" " style="height:120px"><?= htmlspecialchars($profile['bio']) ?></textarea>
-                        <label for="bio">Bio (tell clients about yourself)</label>
-                    </div>
-                </div>
-                <div class="col-12">
-                    <div class="form-floating mb-3">
-                        <input type="password" class="form-control" id="password" name="password" placeholder=" ">
-                        <label for="password">New Password (leave blank to keep current)</label>
-                    </div>
-                </div>
-                <input type="file" name="profile_image" id="profile_image" accept="image/*" style="display:none">
-                <div class="col-12 text-center">
                     <button type="submit" class="btn btn-update">
                         <i class="fas fa-save me-2"></i>Update Profile
                     </button>
-                </div>
+                </form>
             </div>
-        </form>
+        </div>
     </div>
 
     <?php if ($msg): ?>
@@ -366,27 +509,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         });
 
         // Profile image upload
-        document.getElementById('profile_image_input').addEventListener('change', function(e) {
-            if (this.files && this.files[0]) {
-                const file = this.files[0];
-                const actualFileInput = document.getElementById('profile_image');
+        // document.getElementById('profile_image_input').addEventListener('change', function(e) {
+        //     if (this.files && this.files[0]) {
+        //         const file = this.files[0];
+        //         const actualFileInput = document.getElementById('profile_image');
                 
-                // Update hidden file input
-                const dataTransfer = new DataTransfer();
-                dataTransfer.items.add(file);
-                actualFileInput.files = dataTransfer.files;
+        //         // Update hidden file input
+        //         const dataTransfer = new DataTransfer();
+        //         dataTransfer.items.add(file);
+        //         actualFileInput.files = dataTransfer.files;
                 
-                // Preview image
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    document.querySelector('.profile-image').src = e.target.result;
-                };
-                reader.readAsDataURL(file);
+        //         // Preview image
+        //         const reader = new FileReader();
+        //         reader.onload = function(e) {
+        //             document.querySelector('.profile-image').src = e.target.result;
+        //         };
+        //         reader.readAsDataURL(file);
                 
-                // Auto-submit form
-                document.getElementById('profile_form').submit();
-            }
-        });
+        //         // Auto-submit form
+        //         document.getElementById('profile_form').submit();
+        //     }
+        // });
 
         // Success message
         <?php if ($success): ?>
